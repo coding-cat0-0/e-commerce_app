@@ -1,0 +1,28 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Environment variables / secrets
+*.env
+
+
+# Ignore Alembic migrations
+alembic/
+
+# Ignore screen activity tracker folder
+screen_activity_tracker/
+
+# Ignore check script
+check.py
+
+# Ignore database files
+*.db
+*.sqlite3
