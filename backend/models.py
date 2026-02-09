@@ -3,7 +3,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from pydantic import field_validator 
 import re
 from typing import Optional, List
-from enum import ENUM
+from enum import Enum
 
 class User(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
@@ -17,7 +17,7 @@ class User(SQLModel, table=True):
     
 class Product(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
-    seller_id = Field(foreign_key="user.id", nullable=False)
+    seller_id:int = Field(foreign_key="user.id", nullable=False)
     name: str = Field(nullable=False)
     description: Optional[str] = None
     type: str = Field(nullable=False)
@@ -77,7 +77,7 @@ class Help(SQLModel, table=True):
     message: str = Field(nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow) 
 
-class ApplicationStatus(str,ENUM):
+class ApplicationStatus(str,Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     REJECTED = "rejected"

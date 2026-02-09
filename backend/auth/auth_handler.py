@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 import jwt
 from typing import Optional
 from decouple import config
-
+from typing import Dict
+from passlib.context import CryptContext
 SECRET: str = config("SECRET_KEY", cast=str)
 ALGORITHM: str = config("ALGORITHM", cast=str ,default="HS256")
 

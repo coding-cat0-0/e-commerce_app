@@ -1,6 +1,6 @@
 from auth.auth_handler import create_access_token
-from .types import AuthPayload, SignUpResponse, StandardResponse, ProductType, ListApplications, ListUserOrders
-from auth.jwt_auth import check_hashed_password
+from .gql_types import AuthPayload, SignUpResponse, StandardResponse, ProductType, ListApplications, ListUserOrders
+from auth.jwt_auth import check_hashed_password, hash_password
 from models import User, Product, Order, AddToCart, Payment, SellerApplication
 from sqlmodel import select
 
@@ -200,15 +200,14 @@ def seller_application(info,user_id, data):
 def handle_application(info, applicant_id, data):
     
     session = info.context["session"]
-    application = session.exec(select(SellerApplication).where(user_id == applicant_id)).first()
+    application = session.exec(select(SellerApplication).where(SellerApplication.user_id == applicant_id)).first()
     if not applicant:
         raise Exception("The application is no longer available maybe the applicant deleted it")
-    if data.status == "rejected":
-        application.status = "rejected"
-    else:
-        application.status = "accepted"
+
+    application.status = data.status
+    session.commit()
     
-    return  StandardResponse(f"You have approved application of applicant ID: {applicant_id}")
+    return  StandardResponse(f"You have {data.status} application of applicant ID: {applicant_id}")
 
 def get_applications(info):
     session = info.context["session"]
@@ -233,7 +232,7 @@ def view_orders(info):
     
     if role == "user":
         orders = session.exec(select(Order).where(user_id == user_id)).all()
-        p = session.exec(select(Product).where(id = orders.product_id)).first()
+        p = session.exec(select(Product).where(Product.id == orders.product_id)).first()
         return [ListUserOrders(product= p.name,
                 t_amount = orders.total_amount,
                 is_cancelled = orders.is_cancelled,
@@ -243,15 +242,157 @@ def view_orders(info):
     
     elif role == "seller":
         orders = session.exec(select(Order).where(user_id == user_id)).all()
-        p = session.exec(select(Product).where(id = orders.product_id)).first()
+        p = session.exec(select(Product).where(Product.id == orders.product_id)).first()
         return [ListUserOrders(product= p.name,
                 t_amount = orders.total_amount,
                 is_cancelled = orders.is_cancelled,
                 address = orders.address,
                 number = orders.phone_number,
                 payed=orders.is_payed)for order in orders]
+
+def cancel_order_resolver(info, user_id, data):
+    session = info.context["session"]
+    order_details = session.get(Order, data.order_id)
+    if not order_details:
+        raise Exception("Order not found")
+    if order_details.user_id != user_id:
+        raise Exception("You are not authorized to cancel this order")
+    
+    order_details.is_cancelled = True
+    session.commit()
+    return StandardResponse(message="Order cancelled successfully")
+
+def product_filter_resolver(info,data):
+    session = info.context["session"]
+    if data.filter == "price_range":
+        products = session.exec(
+            select(Product).where(
+                (Product.price >= data.min_price) & (Product.price <= data.max_price)
+            )
+        ).all()
+        return [ProductType(
+            id=product.id,
+            name=product.name,
+            description=product.description,
+            product_type=product.type,
+            price=product.price,
+            quantity=product.quantity
+        ) for product in products]
+        
+    elif data.filter == "type":
+        products = session.exec(
+            select(Product).where(Product.type == data.type)
+        ).all()
+        return [ProductType(
+            id=product.id,
+            name=product.name,
+            description=product.description,
+            product_type=product.type,
+            price=product.price,
+            quantity=product.quantity
+        ) for product in products]
+    
+    elif data.filter == "by_date":
+        products = session.exec(
+            select(Product).where(
+                (Product.created_at >= data.start_date) & (Product.created_at <= data.end_date)
+            )
+        ).all()
+        return [ProductType(
+            id=product.id,
+            name=product.name,
+            description=product.description,
+            product_type=product.type,
+            price=product.price,
+            quantity=product.quantity
+        ) for product in products]
+        
+    elif data.filter=="popular":
+        popular_products = (
+            session.exec(
+                select(
+                    Order.product_id,
+                    func.count(Order.id).label("order_count")
+                )
+                .group_by(Order.product_id)
+                .order_by(func.count(Order.id).desc())
+                .limit(20)
+            ).all()
+        )
+
+
+        product_ids = [prod[0] for prod in popular_products]
+        products = session.exec(
+            select(Product).where(Product.id.in_(product_ids))
+        ).all()
+        product_map = {product.id: product for product in products}
+        # Return products in popularity order
+        return [
+            ProductType(
+                id=product_map[prod_id].id,
+                name=product_map[prod_id].name,
+                description=product_map[prod_id].description,
+                product_type=product_map[prod_id].type,
+                price=product_map[prod_id].price,
+                quantity=product_map[prod_id].quantity
+            )
+            for prod_id, _ in popular_products if prod_id in product_map
+        ]
+                    
+    
+def sumbit_app(info, user_id, data):
+    session = info.context["session"]
+    application = SellerApplication(
+        user_id=user_id,
+        business_name=data.business_name,
+        business_details=data.business_details,
+        business_address=data.business_address,
+        contact_email=data.contact_email,
+        contact_phone=data.contact_phone
+    )
+    session.add(application)
+    session.commit()
+    return StandardResponse(
+        message=
+        "Seller application submitted successfully.We will respond to your application shortly"
+        )
+    
+def get_apps(info):
+    session = info.context["session"]
+    applications = session.exec(select(SellerApplication)).all()
+    if not applications:
+        return Exception("No applications yet")
+    
+    return [ListApplications(
+        user_id=application.user_id,
+        business_name=application.business_name,
+        address=application.business_address,
+        email=application.contact_email,
+        number=application.contact_phone
+    ) for application in applications]
     
     
+def del_application(info,user_id, applicant_id):
+    session = info.context["session"]
+    application = session.exec(select(SellerApplication
+                                      ).where(SellerApplication.user_id == user_id,
+                                          SellerApplication.id == applicant_id)).first()
+    if not application:
+        raise Exception("The application is no longer available maybe the applicant deleted it")
     
+    session.delete(application)
+    session.commit()
+    return StandardResponse(message="Application deleted successfully")
     
-    
+def search_products(info,prod_type):
+
+    session = info.context["session"]
+    get_products = session.exec(select(Product).where(Product.type == prod_type)).all()
+    return [ProductType(
+        id=product.id,
+        name=product.name,
+        description=product.description,
+        product_type=product.type,
+        price=product.price,
+        quantity=product.quantity
+    ) for product in get_products]

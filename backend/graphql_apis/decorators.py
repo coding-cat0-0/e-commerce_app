@@ -1,6 +1,6 @@
 from strawberry.exceptions import GraphQLError
 from functools import wraps
-def required_role(info, *req_role):
+def required_role(info,*req_role):
         def decorator(resolver):
             @wraps(resolver)
             def wrapper(*args, **kwargs):

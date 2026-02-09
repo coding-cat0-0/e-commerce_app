@@ -1,6 +1,6 @@
 from fastapi import HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-
+from passlib.context import CryptContext
 from .auth_handler import decode_access_token
 import bcrypt
 
