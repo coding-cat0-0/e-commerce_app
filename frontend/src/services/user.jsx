@@ -1,23 +1,7 @@
 import axios from 'axios';
 import authService from './auth.service';
-
 class userService{
-    addToCart(productId,cartDetails){
-        return axios.post(`GQL_URL`, {
-            query: `
-                mutation AddToCart($productId: ID!, $cartDetails: CartInput!) {
-                    addToCart(productId: $productId, data: $cartDetails) {
-                        id
-                    }
-        }`,
-            variables: {
-                productId: productId,
-                cartDetails: cartDetails
-            }
-        }, {
-            headers: { 'Authorization': authService.authHeader()}
-        });
-    }
+
     placeOrder(orderDetails){
         return axios.post(`GQL_URL`, {
             query: `

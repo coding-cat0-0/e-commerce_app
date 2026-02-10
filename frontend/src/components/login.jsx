@@ -3,6 +3,8 @@ import { Form, Input, Button as CheckButton } from "react-validation";
 import { isEmail } from "validator";
 import {useForm} from "react-hook-form";
 import AuthService from "../services/auth.service";
+import { AuthContext } from "../context/Auth.Context";
+import { useContext } from "react";
 
 const Login = () => {
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
@@ -10,11 +12,16 @@ const Login = () => {
     const [message, setMessage] = useState("");
     const form = useRef();
     const checkBtn = useRef();
+    const { setLoggedIn } = useContext(AuthContext);
+    const navigate = useNavigate();
     const onSubmit = async (data) => {
         try {
             await AuthService.login(data.email, data.password);
+            setLoggedIn(true);
+            //write navigation logic here;
             alert("Login successful!");
         } catch (error) {
+            setLoggedIn(false);
             alert("Login failed: " + error.message);
         }
     }

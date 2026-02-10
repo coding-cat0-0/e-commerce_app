@@ -1,5 +1,7 @@
 import axios from 'axios';
 import jwt from 'jwt-decode';
+import { AuthContext } from '../context/Auth.Context'; 
+
 class AuthService {
       login(email, password) {
         return axios
@@ -9,7 +11,7 @@ class AuthService {
                 }).then(response => {
                     if(response.data.access_token){
                         localStorage.setItem('token', JSON.stringify(response.data));
-                    }
+                      }
                     return response.data 
                 });
       }
